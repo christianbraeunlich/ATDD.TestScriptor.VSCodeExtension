@@ -1,0 +1,128 @@
+name: CICD
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+  schedule:
+    - cron: '0 3 * * 1'
+
+env:
+  RUN_VERSION: 0.10.${{ github.run_number }}
+  NODE_VERSION: 16.18.1
+  working-directory-webui: ./web-ui
+  working-directory-vsc: ./vscode-extension
+
+jobs:
+  build:
+    name: Build
+    if: github.repository == 'christianbraeunlich/ATDD.TestScriptor.VSCodeExtension'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Use Node.js v${{env.NODE_VERSION}}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{env.NODE_VERSION}}
+
+      - name: Use aurelia-cli
+        run: npm install -g aurelia-cli
+        working-directory: ${{env.working-directory-webui}}
+
+      - name: Install
+        run: npm install
+        working-directory: ${{env.working-directory-webui}}
+
+      - name: Run Build
+        run: npm run build
+        working-directory: ${{env.working-directory-webui}}
+
+      - name: Use VSCE
+        run: npm install -g vsce
+        working-directory: ${{env.working-directory-vsc}}
+
+      - name: Install
+        run: npm install
+        working-directory: ${{env.working-directory-vsc}}
+
+      - name: Update package.json
+        shell: pwsh
+        run: '((Get-Content -path ./package.json -Raw) -replace ''"debugMode": true'',''"debugMode": false'') | Set-Content -Path ./package.json'
+        working-directory: ${{env.working-directory-vsc}}
+
+      - name: VS Ext. set version
+        shell: pwsh
+        run: 'yarn version --no-git-tag-version --new-version ${{ env.RUN_VERSION }}'
+        working-directory: ${{env.working-directory-vsc}}
+
+      - name: Run Build
+        run: npx vsce package
+        working-directory: ${{env.working-directory-vsc}}
+
+      - name: Save VSIX name
+        shell: pwsh
+        run: |
+          $name = (Split-Path (Get-Item -Path '*.vsix') -leaf)
+          "VSIX_NAME=$name" >> $env:GITHUB_ENV
+        working-directory: ${{env.working-directory-vsc}}
+
+      - uses: actions/upload-artifact@v3
+        with:
+          path: ${{env.working-directory-vsc}}/${{ env.VSIX_NAME }}
+          name: ${{ env.VSIX_NAME }}
+          retention-days: 2
+
+  release:
+    name: Release
+    needs: build
+    if: ${{ (github.ref == 'refs/heads/master') && (github.event_name != 'schedule') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - uses: actions/download-artifact@v3
+        with:
+          path: ${{env.working-directory-vsc}}
+
+      - name: Use Node.js v${{env.NODE_VERSION}}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{env.NODE_VERSION}}
+
+      - name: Save VSIX name
+        shell: pwsh
+        run: |
+          $name = (Split-Path (Get-Item -Path '*.vsix') -leaf)
+          "VSIX_NAME=$name" >> $env:GITHUB_ENV
+        working-directory: ${{env.working-directory-vsc}}
+
+      - uses: actions/create-release@v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ env.RUN_VERSION }}
+          release_name: 'Release v${{ env.RUN_VERSION }}'
+          body: |
+            See [Change Log](https://github.com/fluxxus-nl/ATDD.TestScriptor.VSCodeExtension/blob/main/CHANGELOG.md) for details.
+          draft: false
+          prerelease: false
+
+      - uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ env.working-directory-vsc }}/${{ env.VSIX_NAME }}
+          asset_name: ${{ env.VSIX_NAME }}
+          asset_content_type: application/zip
+
+      - name: Publish to Marketplace
+        run: vsce publish -pat ${{ secrets.VSCE_PAT_LOCAL }}
+        working-directory: ${{env.working-directory-vsc}}

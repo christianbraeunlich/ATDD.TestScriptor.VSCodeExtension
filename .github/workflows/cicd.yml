@@ -20,8 +20,8 @@ env:
 
 jobs:
   cicd:
-    name: Build, Release and Publisher
-    if: github.repository == 'christianbraeunlich/ATDD.TestScriptor.VSCodeExtension'
+    name: Build, Release and Publish
+    if: github.repository == 'fluxxus-nl/ATDD.TestScriptor.VSCodeExtension'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

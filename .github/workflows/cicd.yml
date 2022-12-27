@@ -114,6 +114,9 @@ jobs:
           draft: false
           prerelease: false
 
+      - name: Display structure of downloaded files
+        run: ls -R
+
       - uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

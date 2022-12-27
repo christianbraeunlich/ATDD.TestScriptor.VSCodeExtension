@@ -65,6 +65,13 @@ jobs:
         run: npx vsce package
         working-directory: ${{env.working-directory-vsc}}
 
+      - name: Save VSIX name
+        shell: pwsh
+        run: |
+          $name = (Split-Path (Get-Item -Path '*.vsix') -leaf)
+          "VSIX_NAME=$name" >> $env:GITHUB_ENV
+        working-directory: ${{env.working-directory-vsc}}
+
       - uses: actions/upload-artifact@v3
         with:
           path: ${{env.working-directory-vsc}}/${{ env.VSIX_NAME }}

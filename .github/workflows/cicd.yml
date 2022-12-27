@@ -9,7 +9,6 @@ on:
       - master
   schedule:
     - cron: '0 3 * * 1'
-  workflow_dispatch:
 
 env:
   RUN_VERSION: 0.10.${{ github.run_number }}

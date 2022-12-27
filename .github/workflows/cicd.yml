@@ -20,7 +20,7 @@ env:
 
 jobs:
   cicd:
-    name: Build, Release and Publish
+    name: Build, Release and Publisher
     if: github.repository == 'christianbraeunlich/ATDD.TestScriptor.VSCodeExtension'
     runs-on: ubuntu-latest
     steps:
